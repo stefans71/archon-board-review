@@ -41,10 +41,12 @@ BOARD_USER=$(grep '^board_user:' "$CONFIG_FILE" | sed 's/board_user://' | xargs)
 ### 0.2 Resolve Agent Settings
 
 For each agent (pragmatist, systems-thinker, skeptic), extract from config:
-- `cli` — which CLI to use (claude or codex)
+- `cli` — which CLI to use (claude, codex, or qwen)
 - `model` — model identifier
 - `flags` — CLI flags
 - `timeout` — max seconds per agent invocation
+- `env_OPENAI_API_KEY` — optional API key override (for qwen CLI with external providers)
+- `env_OPENAI_BASE_URL` — optional base URL override (for qwen CLI with external providers)
 
 ```bash
 # Example extraction for pragmatist:
@@ -246,19 +248,27 @@ Build invocation commands from config. The prompt for each agent is the same:
 read CLAUDE.md then read inbox/context.md and inbox/brief.md and write your report to outbox/report.md
 ```
 
-**For claude-based agents** (pragmatist, skeptic):
+**For claude-based agents**:
 ```bash
 AGENT_DIR="$BOARD_DIR/{agent}"
-timeout $TIMEOUT [sudo -u $BOARD_USER] bash -c "unset CLAUDECODE && cd $AGENT_DIR && claude $FLAGS --model $MODEL -p '$PROMPT'" &
+timeout $TIMEOUT [sudo -u $BOARD_USER] bash -c "unset CLAUDECODE && cd $AGENT_DIR && claude $FLAGS --model $MODEL -p '$PROMPT' < /dev/null" &
 ```
 
-**For codex-based agents** (systems-thinker):
+**For codex-based agents**:
 ```bash
 AGENT_DIR="$BOARD_DIR/{agent}"
-timeout $TIMEOUT [sudo -u $BOARD_USER] bash -c "cd $AGENT_DIR && codex exec -m '$MODEL' $FLAGS '$PROMPT'" &
+timeout $TIMEOUT [sudo -u $BOARD_USER] bash -c "cd $AGENT_DIR && codex exec -m '$MODEL' $FLAGS '$PROMPT' < /dev/null" &
+```
+
+**For qwen-based agents** (e.g., DeepSeek via OpenAI-compatible API):
+```bash
+AGENT_DIR="$BOARD_DIR/{agent}"
+timeout $TIMEOUT [sudo -u $BOARD_USER] bash -c "export OPENAI_API_KEY='$ENV_OPENAI_API_KEY' OPENAI_BASE_URL='$ENV_OPENAI_BASE_URL' && cd $AGENT_DIR && qwen $FLAGS -m '$MODEL' -p '$PROMPT' < /dev/null" &
 ```
 
 The `[sudo -u $BOARD_USER]` prefix is only added when `BOARD_USER` is configured.
+The `< /dev/null` prevents stdin hangs when running agents in background.
+For qwen agents, `env_OPENAI_API_KEY` and `env_OPENAI_BASE_URL` are read from the agent's config section.
 
 Launch all three in parallel, capture PIDs, wait for all to complete.
 

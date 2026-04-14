@@ -40,9 +40,14 @@ archon workflow run archon-board-plan-to-pr -- docs/implementation-plan.md
 ## Prerequisites
 
 - [Archon](https://github.com/coleam00/Archon) installed
-- **claude** CLI ([Claude Code](https://claude.ai/code)) — required for Pragmatist and Skeptic agents
-- **codex** CLI ([OpenAI Codex](https://platform.openai.com/docs/codex)) — required for Systems Thinker agent
-- OpenRouter API key configured in Claude Code — for DeepSeek V3.2 routing (Skeptic agent)
+
+**Supported CLIs** (at least one required, mix and match per agent):
+
+| CLI | Install | Used for |
+|-----|---------|----------|
+| **claude** | [Claude Code](https://claude.ai/code) | Claude models (Opus, Sonnet, Haiku) |
+| **codex** | [OpenAI Codex](https://platform.openai.com/docs/codex) | GPT models (GPT-5.2 Codex) |
+| **qwen** | [Qwen Code](https://github.com/QwenLM/qwen-code) | Qwen models + any OpenAI-compatible API (DeepSeek, etc.) |
 
 Not all three CLIs are required. You can configure all agents to use the same CLI with different models. See [Configuration](#configuration).
 
@@ -109,26 +114,38 @@ agents:
     flags: "--dangerously-bypass-approvals-and-sandbox"
     timeout: 900
   skeptic:
-    cli: claude
-    model: deepseek/deepseek-v3.2    # via OpenRouter
-    flags: "--dangerously-skip-permissions"
+    # DeepSeek R3.2 via Qwen CLI (OpenAI-compatible API)
+    cli: qwen
+    model: deepseek-reasoner
+    flags: "--yolo"
+    env_OPENAI_API_KEY: "${DEEPSEEK_API_KEY}"
+    env_OPENAI_BASE_URL: "https://api.deepseek.com"
     timeout: 900
 ```
 
-### All-Claude Setup (no Codex or OpenRouter needed)
+### All-Claude Setup (simplest — one CLI, one provider)
 
 ```yaml
 agents:
-  pragmatist:
-    cli: claude
-    model: claude-opus-4-6
-  systems-thinker:
-    cli: claude
-    model: claude-sonnet-4-6
-  skeptic:
-    cli: claude
-    model: claude-opus-4-6
+  pragmatist:  { cli: claude, model: claude-opus-4-6, flags: "--dangerously-skip-permissions" }
+  systems-thinker: { cli: claude, model: claude-sonnet-4-6, flags: "--dangerously-skip-permissions" }
+  skeptic:     { cli: claude, model: claude-opus-4-6, flags: "--dangerously-skip-permissions" }
 ```
+
+### DeepSeek via Qwen CLI
+
+The [Qwen CLI](https://github.com/QwenLM/qwen-code) supports any OpenAI-compatible API via environment variables. To use DeepSeek:
+
+```yaml
+skeptic:
+  cli: qwen
+  model: deepseek-reasoner        # or deepseek-chat for non-reasoning
+  flags: "--yolo"
+  env_OPENAI_API_KEY: "${DEEPSEEK_API_KEY}"
+  env_OPENAI_BASE_URL: "https://api.deepseek.com"
+```
+
+This works with any OpenAI-compatible provider — just change the model and base URL.
 
 ### Board User (optional)
 
