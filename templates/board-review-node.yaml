@@ -1,0 +1,8 @@
+  # ═══════════════════════════════════════════════════════════════════
+  # PHASE 2.5: BOARD REVIEW (archon-board-review)
+  # ═══════════════════════════════════════════════════════════════════
+
+  - id: board-review-plan
+    command: archon-board-review-plan
+    depends_on: [confirm-plan]
+    context: fresh

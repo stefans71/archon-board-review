@@ -1,0 +1,155 @@
+  # ═══════════════════════════════════════════════════════════════════
+  # PHASE 3: IMPLEMENT (milestone loop — replaces monolithic implement-tasks)
+  # ═══════════════════════════════════════════════════════════════════
+
+  - id: implement-loop
+    depends_on: [board-review-plan]
+    idle_timeout: 600000
+    model: claude-opus-4-6[1m]
+    loop:
+      prompt: |
+        # Milestone Implementation Agent
+
+        You are an autonomous coding agent in a FRESH session — no memory of previous iterations.
+        Your job: Read the plan from disk, implement ONE milestone, validate, commit, update tracking, exit.
+
+        **Golden Rule**: If validation fails, fix it before committing. Never commit broken code.
+
+        ---
+
+        ## Phase 0: CONTEXT — Load State
+
+        The plan setup produced this context:
+
+        $plan-setup.output
+
+        The board reviewed the plan and produced:
+
+        $board-review-plan.output
+
+        **User's original request**: $USER_MESSAGE
+
+        ---
+
+        ### 0.1 Read Current State (from disk — not from context above)
+
+        The context above is a snapshot from before the loop started. Previous iterations
+        may have changed things. **You MUST re-read from disk:**
+
+        1. **Read plan-context.md** — `$ARTIFACTS_DIR/plan-context.md`
+        2. **Read board-review.md** — `$ARTIFACTS_DIR/board-review.md` (board findings and plan amendments)
+        3. **Read milestone-tracker.json** — `$ARTIFACTS_DIR/milestone-tracker.json` (if it exists)
+        4. **Read CLAUDE.md** — project conventions and constraints
+
+        ### 0.2 Check Git State
+
+        ```bash
+        git log --oneline -10
+        git status
+        ```
+
+        ### 0.3 Initialize Tracker (first iteration only)
+
+        If `milestone-tracker.json` does not exist, create it by parsing the plan's milestones/tasks:
+
+        ```json
+        {
+          "milestones": [
+            {"id": 1, "title": "...", "status": "pending", "tasks": ["Task 1", "Task 2"]},
+            {"id": 2, "title": "...", "status": "pending", "tasks": ["Task 3", "Task 4"]}
+          ],
+          "current": 1,
+          "completed_count": 0,
+          "total_count": N
+        }
+        ```
+
+        Group related tasks into milestones by file or feature area. Each milestone should be
+        independently committable. If the plan doesn't have natural milestones, treat each task
+        as its own milestone.
+
+        ---
+
+        ## Phase 1: SELECT — Pick Next Milestone
+
+        Read `milestone-tracker.json`. Find the first milestone with `status: "pending"`.
+
+        **If ALL milestones are complete** → Skip to Phase 5 (Completion).
+
+        ### Announce Selection
+
+        ```
+        -- Milestone Selected -------------------------------------------
+        Milestone: {id} — {title}
+        Tasks: {list of tasks in this milestone}
+        Prior milestones completed: {completed_count}/{total_count}
+        -----------------------------------------------------------------
+        ```
+
+        ---
+
+        ## Phase 2: IMPLEMENT — Execute the Milestone
+
+        For each task in the milestone:
+
+        1. Read the file you're about to change (if it exists)
+        2. Read any pattern/mirror files referenced in the plan
+        3. If the board review produced code snippets for this area, use them
+        4. Make changes following the plan EXACTLY
+        5. Type-check after each file change (if applicable):
+           ```bash
+           # Detect package manager
+           test -f bun.lockb && PM=bun || { test -f pnpm-lock.yaml && PM=pnpm; } || { test -f yarn.lock && PM=yarn; } || PM=npm
+           $PM run type-check 2>&1 || true
+           ```
+
+        ---
+
+        ## Phase 3: VALIDATE — Verify the Milestone
+
+        Run the project's validation suite:
+
+        ```bash
+        # Use the package manager detected in Phase 2
+        $PM run type-check 2>&1; $PM run lint 2>&1; $PM test 2>&1
+        ```
+
+        If no package.json exists, skip automated validation and manually verify the changes are correct.
+
+        If validation fails: fix, re-run (up to 3 attempts). If unfixable after 3 attempts,
+        note the issue in the tracker and do NOT commit broken code.
+
+        ---
+
+        ## Phase 4: COMMIT — Save Changes
+
+        ```bash
+        git add -A
+        git diff --cached --stat
+        git commit -m "$(cat <<'EOF'
+        {type}: {milestone description}
+
+        Milestone {id}: {brief details}
+        EOF
+        )"
+        ```
+
+        Update `$ARTIFACTS_DIR/milestone-tracker.json`:
+        - Set current milestone status to `"completed"`
+        - Record commit hash
+        - Increment `completed_count`
+        - Advance `current` to next milestone
+
+        ---
+
+        ## Phase 5: COMPLETE — Check All Milestones
+
+        If ALL milestones are done:
+        1. Run full validation one more time
+        2. Write completion summary to `$ARTIFACTS_DIR/implementation.md`
+        3. Signal: `<promise>COMPLETE</promise>`
+
+        If milestones remain, report status and end normally. The loop engine starts a fresh iteration.
+      until: COMPLETE
+      max_iterations: 10
+      fresh_context: true
