@@ -1,0 +1,8 @@
+  # ═══════════════════════════════════════════════════════════════════
+  # PHASE 6.5: BOARD CODE REVIEW (FrontierBoard multi-model governance)
+  # ═══════════════════════════════════════════════════════════════════
+
+  - id: board-review-code
+    command: archon-board-review-code
+    depends_on: [synthesize]
+    context: fresh

@@ -15,7 +15,7 @@ Run a multi-model board review on the implementation plan before code is written
 Three agents with different model families review the plan following the 4-round SOP:
 Blind Review → Consolidation → Deliberation (if needed) → Confirmation.
 
-FIX NOW items are applied to the plan. The reviewed plan becomes the implementation source.
+Board agents author fix artifacts for FIX NOW items, then fixes are applied to the plan. The reviewed plan becomes the implementation source.
 
 **This step does NOT implement anything** — it reviews and improves the plan.
 
@@ -426,22 +426,77 @@ If any agent blocks:
 
 ---
 
+## Phase 7.5: FIX ARTIFACT AUTHORING (plan review variant)
+
+**Skip this phase if zero FIX NOW items.**
+
+After confirmation, agents author concrete fix artifacts for each FIX NOW item targeting the **plan text**
+(including embedded code snippets). These are plan amendments, not source code patches.
+
+### 7.5.1 Write Fix Artifact Brief
+
+Write `fix-artifacts-brief.md` to all inboxes containing:
+
+- **All prior context** (agents are ephemeral — include original brief)
+- **The confirmed FIX NOW list** with IDs, descriptions, and affected plan sections
+- **Instructions**: For each FIX NOW item, read the plan and produce:
+
+```
+### C[N]: [Title]
+**Location:** [plan section / embedded code block]
+**Current:** [verbatim plan text with 3+ lines surrounding context]
+**Replacement:** [exact replacement with same context]
+**Rationale:** [one sentence]
+**Dependencies:** [other C-items to apply first]
+```
+
+- **Rules for agents**:
+  1. Read the actual plan to produce Current blocks — do not guess
+  2. Current must match exactly what is in the plan
+  3. Replacement must be complete (not pseudocode)
+  4. If a fix references specific code that hasn't been written yet, note it as provisional
+  5. Note cross-cutting dependencies between fixes
+
+### 7.5.2 Run Fix Artifact Round
+
+Launch all agents (same parallel pattern as Round 1). Each writes `outbox/fix-artifacts.md`.
+Verify reports: at least 2 valid. Retry failed agents once.
+
+### 7.5.3 Reconcile Artifacts
+
+For each FIX NOW item:
+1. If agents agree on the fix → use it
+2. If agents disagree → prefer most specific fix, then fewest sections touched, then root-cause over symptom
+3. Honor cross-cutting dependency order
+
+**PHASE_7.5_CHECKPOINT:**
+
+- [ ] Fix artifact brief written to all inboxes (with full prior context)
+- [ ] Agents produced fix-artifacts.md (at least 2 valid)
+- [ ] Artifacts reconciled — one authoritative fix per FIX NOW item
+- [ ] Cross-cutting dependencies noted
+
+---
+
 ## Phase 8: APPLY — Fix the Plan
 
 ### 8.1 Collect FIX NOW Items
 
 From the final consolidated findings, extract all items classified as FIX NOW.
 
-### 8.2 Apply Fixes to Plan
+### 8.2 Apply Fixes from Artifacts
 
-For each FIX NOW item, modify the plan:
-- Wrong task ordering → reorder tasks
-- Missing dependency → add dependency note
-- Incorrect file path → fix the path
-- Missing task → add the task
-- Ambiguous instruction → clarify it
+For each FIX NOW item, apply the reconciled fix artifact from Phase 7.5:
+1. Open the plan at the specified section
+2. Verify the Current block matches the actual plan text (use anchored context, not line numbers)
+3. Replace with the Replacement block
+4. If Current does not match (plan changed since review), stop and flag the mismatch
 
-**Do NOT rewrite the plan from scratch.** Make targeted edits that address each finding.
+Apply in dependency order noted during artifact reconciliation.
+
+**Do NOT rewrite the plan from scratch.** Apply artifacts as targeted edits.
+If an artifact cannot be applied (mismatch, missing section), document the failure
+and fall back to manual fix for that item only.
 
 ### 8.3 Write Amended Plan
 
@@ -453,6 +508,7 @@ If no FIX NOW items, the original plan stands unchanged.
 **PHASE_8_CHECKPOINT:**
 
 - [ ] FIX NOW items extracted
+- [ ] Fix artifacts applied via anchored context matching
 - [ ] Plan amendments applied (if any)
 - [ ] Amended plan written (if applicable)
 
@@ -620,6 +676,7 @@ Cannot review a blocked plan. Stop immediately.
 
 - **AGENTS_RAN**: At least 2 of 3 agents produced valid reports
 - **SOP_FOLLOWED**: 4-round process completed (3 if unanimous after R2)
-- **FIX_NOW_APPLIED**: All FIX NOW items applied to plan
+- **ARTIFACTS_AUTHORED**: Fix artifacts produced for all FIX NOW items (Phase 7.5)
+- **FIX_NOW_APPLIED**: All FIX NOW items applied to plan via anchored-context artifacts
 - **ARTIFACT_WRITTEN**: `board-review.md` contains full review record
 - **LOCK_RELEASED**: Review lock removed
